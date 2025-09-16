@@ -11,4 +11,5 @@ Groups together entries with a shared prefix
 - Better but still non-intrusive style
 - Saved un/collapsed states
 - General fixes to errors I can spot and fix
-- Might also give a new folder-like system to the drop down since I want to sort character/world/chat/prompts interdependently 
+- Might also give a new folder-like system to the drop down since I want to sort character/world/chat/prompts interdependently
+- Learning how to make this from scratch instead of gutting and reverse engineering 
