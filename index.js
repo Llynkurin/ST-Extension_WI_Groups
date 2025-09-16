@@ -3,7 +3,7 @@ import { saveSettingsDebounced } from "../../../../script.js";
 
 (function () {
     'use strict';
-    const MODULE_NAME = 'third-party/__WI_parentFolders';
+    const MODULE_NAME = 'third-party/ST-Extension_WI_Groups';
     let retryCount = 0;
     let refreshDebounceTimer;
 
@@ -172,4 +172,5 @@ import { saveSettingsDebounced } from "../../../../script.js";
             }
         }, 500);
     });
+
 })();
