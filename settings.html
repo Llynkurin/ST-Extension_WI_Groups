@@ -11,15 +11,20 @@
                 <input id="wi-accordion-enabled" type="checkbox" class="checkbox">
                 Enable Grouping
             </label>
-
             <label class="checkbox_label" for="wi-accordion-collapsed">
                 <input id="wi-accordion-collapsed" type="checkbox" class="checkbox">
                 Collapse groups by default
             </label>
-
+            <label class="checkbox_label" for="wi-accordion-consolidate">
+                <input id="wi-accordion-consolidate" type="checkbox" class="checkbox">
+                <span>Consolidate entries physically</span>
+                <small style="display: block; margin-top: 4px; opacity: 0.7; font-size: 0.85em;">
+                    Enabled: Group entries together.<br>
+                    Disabled: Entries stay in their original positions.
+                </small>
+            </label>
             <label for="wi-accordion-min-size">Minimum group size:</label>
             <input id="wi-accordion-min-size" type="number" min="2" max="10" class="text_pole">
-
             <label for="wi-accordion-separator">Group separator:</label>
             <input id="wi-accordion-separator" type="text" class="text_pole">
         </div>
