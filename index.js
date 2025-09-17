@@ -4,24 +4,24 @@ import { saveSettingsDebounced } from "../../../../script.js";
 (function () {
     'use strict';
     const MODULE_NAME = 'third-party/ST-Extension_WI_Groups';
-    let retryCount = 0;
-    let refreshDebounceTimer;
+    let observer = null;
+    let groupingTimer = null;
+    let isReady = false;
 
     const defaultSettings = {
         isEnabled: true,
         minGroupSize: 2,
         separator: ':',
-        defaultCollapsed: true
+        defaultCollapsed: true,
+        consolidateGroups: true,
+        groupStates: {}
     };
 
-    let settings = {};
+    let settings = { ...defaultSettings };
 
     function loadSettings() {
-        if (extension_settings[MODULE_NAME]) {
-            settings = Object.assign({}, defaultSettings, extension_settings[MODULE_NAME]);
-        } else {
-            settings = { ...defaultSettings };
-        }
+        settings = Object.assign({}, defaultSettings, extension_settings[MODULE_NAME] || {});
+        if (!settings.groupStates) settings.groupStates = {};
         extension_settings[MODULE_NAME] = settings;
     }
 
@@ -30,68 +30,125 @@ import { saveSettingsDebounced } from "../../../../script.js";
         saveSettingsDebounced();
     }
 
-    function onSettingsChange() {
-        settings.isEnabled = $('#wi-accordion-enabled').is(':checked');
-        settings.minGroupSize = parseInt($('#wi-accordion-min-size').val()) || 2;
-        settings.separator = $('#wi-accordion-separator').val() || ':';
-        settings.defaultCollapsed = $('#wi-accordion-collapsed').is(':checked');
-        saveSettings();
-        refreshWIView();
+    function addPreventiveCSS() {
+        if (document.getElementById('wi-groups-preventive-css')) return;
+
+        const style = document.createElement('style');
+        style.id = 'wi-groups-preventive-css';
+        style.textContent = `
+            #world_popup_entries_list:not(.wi-groups-ready) {
+                max-height: 0px !important;
+                overflow: hidden !important;
+            }
+            
+            #world_popup_entries_list.wi-groups-ready {
+                max-height: 9999px !important;
+                overflow: visible !important;
+                transition: all 0.4s ease-out;
+            }
+            
+            .wi-groups-disabled #world_popup_entries_list {
+                max-height: none !important;
+                overflow: visible !important;
+                transition: none !important;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    function markAsReady() {
+        const entriesList = document.getElementById('world_popup_entries_list');
+        const popup = document.getElementById('world_popup');
+
+        if (entriesList) {
+            entriesList.classList.add('wi-groups-ready');
+        }
+
+        if (popup) {
+            if (settings.isEnabled) {
+                popup.classList.remove('wi-groups-disabled');
+            } else {
+                popup.classList.add('wi-groups-disabled');
+            }
+        }
+
+        isReady = true;
+    }
+
+    function markAsNotReady() {
+        const entriesList = document.getElementById('world_popup_entries_list');
+        if (entriesList) {
+            entriesList.classList.remove('wi-groups-ready');
+        }
+        isReady = false;
     }
 
     function getGroupName(text) {
         if (!text || !settings.separator) return null;
-        const separatorIndex = text.indexOf(settings.separator);
-        if (separatorIndex === -1) return null;
-        return text.substring(0, separatorIndex).trim();
+        const idx = text.indexOf(settings.separator);
+        return idx === -1 ? null : text.substring(0, idx).trim();
     }
 
     function createGroupHeader(groupName, entryCount) {
         const header = document.createElement('div');
         header.className = 'group-header';
+
+        const isCollapsed = settings.groupStates[groupName] ?? settings.defaultCollapsed;
+        const icon = isCollapsed ? '▶' : '▼';
+
         header.innerHTML = `
             <div class="group-header-content">
-                <span class="group-header-icon">▼</span>
+                <span class="group-header-icon">${icon}</span>
                 <span class="group-header-title"><strong>${groupName}</strong></span>
-                <span class="group-header-count">(${entryCount})</span>
-            </div>
-        `;
+                <span class="group-header-count">${entryCount} Entries</span>
+            </div>`;
+
         header.setAttribute('data-group-name', groupName);
-        header.addEventListener('click', () => toggleGroup(header));
+        if (isCollapsed) header.classList.add('collapsed');
+
+        header.addEventListener('click', () => {
+            const wasCollapsed = header.classList.contains('collapsed');
+            const nowCollapsed = !wasCollapsed;
+
+            document.querySelectorAll(`.world_entry[data-group-name="${groupName}"]`)
+                .forEach(entry => entry.style.display = nowCollapsed ? 'none' : '');
+
+            header.querySelector('.group-header-icon').textContent = nowCollapsed ? '▶' : '▼';
+            header.classList.toggle('collapsed', nowCollapsed);
+
+            settings.groupStates[groupName] = nowCollapsed;
+            saveSettings();
+        });
+
         return header;
     }
 
-    function toggleGroup(header) {
-        const groupName = header.getAttribute('data-group-name');
-        const isCollapsed = !header.classList.contains('collapsed');
-        const entries = document.querySelectorAll(`.world_entry[data-group-name="${groupName}"]`);
-
-        entries.forEach(entry => {
-            entry.style.display = isCollapsed ? 'none' : '';
-        });
-
-        header.querySelector('.group-header-icon').textContent = isCollapsed ? '▶' : '▼';
-        header.classList.toggle('collapsed', isCollapsed);
-    }
-
     function groupEntries() {
-        if (!settings.isEnabled) return;
         const entriesList = document.getElementById('world_popup_entries_list');
         if (!entriesList) {
-            console.error('[WI Accordion] Entries list (#world_popup_entries_list) not found!');
+            markAsReady();
             return;
         }
 
-        const entries = Array.from(entriesList.querySelectorAll('.world_entry:not([data-group-name])'));
-        if (entries.length === 0 && document.querySelectorAll('.group-header').length === 0 && retryCount < 3) {
-            retryCount++;
-            setTimeout(groupEntries, 500);
+        if (!settings.isEnabled) {
+            document.querySelectorAll('.group-header').forEach(header => header.remove());
+            document.querySelectorAll('.world_entry').forEach(entry => {
+                entry.style.display = '';
+                entry.removeAttribute('data-group-name');
+            });
+            markAsReady();
             return;
         }
-        retryCount = 0;
+
+        const allEntries = Array.from(entriesList.querySelectorAll('.world_entry'));
+        if (allEntries.length === 0) {
+            markAsReady();
+            return;
+        }
 
         const groups = {};
-        entries.forEach(entry => {
+
+        allEntries.forEach(entry => {
             const textarea = entry.querySelector('textarea[name="comment"]');
             if (textarea) {
                 const groupName = getGroupName(textarea.value);
@@ -102,51 +159,135 @@ import { saveSettingsDebounced } from "../../../../script.js";
             }
         });
 
-        Object.keys(groups).forEach(groupName => {
-            const groupEntries = groups[groupName];
-            const existingGroup = document.querySelector(`.world_entry[data-group-name="${groupName}"]`);
-
-            if (existingGroup) {
-                groupEntries.forEach(entry => entry.setAttribute('data-group-name', groupName));
-            } else if (groupEntries.length >= settings.minGroupSize) {
-                const firstEntry = groupEntries[0];
-                const header = createGroupHeader(groupName, groupEntries.length);
-                firstEntry.parentNode.insertBefore(header, firstEntry);
-                groupEntries.forEach(entry => entry.setAttribute('data-group-name', groupName));
-
-                if (settings.defaultCollapsed) {
-                    toggleGroup(header);
+        if (settings.consolidateGroups) {
+            allEntries.forEach(entry => {
+                const currentGroup = entry.getAttribute('data-group-name');
+                const textarea = entry.querySelector('textarea[name="comment"]');
+                if (textarea) {
+                    const newGroup = getGroupName(textarea.value);
+                    if (currentGroup && currentGroup !== newGroup) {
+                        entry.removeAttribute('data-group-name');
+                        entry.style.display = '';
+                    }
                 }
+            });
+        }
+
+        Object.entries(groups).forEach(([groupName, groupEntries]) => {
+            if (groupEntries.length < settings.minGroupSize) return;
+
+            let header = document.querySelector(`.group-header[data-group-name="${groupName}"]`);
+
+            if (header) {
+                header.querySelector('.group-header-count').textContent = `${groupEntries.length} Entries`;
+            } else {
+                header = createGroupHeader(groupName, groupEntries.length);
+                const firstEntry = groupEntries.find(entry => entry.parentNode);
+                if (firstEntry) firstEntry.parentNode.insertBefore(header, firstEntry);
+            }
+
+            groupEntries.forEach((entry, i) => {
+                if (!entry.hasAttribute('data-group-name')) {
+                    entry.setAttribute('data-group-name', groupName);
+
+                    if (settings.consolidateGroups) {
+                        const target = i === 0 ? header : groupEntries[i - 1];
+                        if (target.nextElementSibling !== entry) {
+                            target.insertAdjacentElement('afterend', entry);
+                        }
+                    }
+                }
+
+                const isCollapsed = header.classList.contains('collapsed');
+                entry.style.display = isCollapsed ? 'none' : '';
+            });
+        });
+
+        document.querySelectorAll('.group-header').forEach(header => {
+            const groupName = header.getAttribute('data-group-name');
+            const entries = document.querySelectorAll(`.world_entry[data-group-name="${groupName}"]`);
+            if (entries.length < settings.minGroupSize) {
+                header.remove();
+                entries.forEach(entry => {
+                    entry.removeAttribute('data-group-name');
+                    entry.style.display = '';
+                });
             }
         });
+
+        markAsReady();
     }
 
-    function refreshWIView() {
+    function scheduleGrouping() {
+        if (isReady) markAsNotReady();
+        clearTimeout(groupingTimer);
+        groupingTimer = setTimeout(groupEntries, 50);
+    }
+
+    function cleanup() {
+        if (observer) observer.disconnect();
+        clearTimeout(groupingTimer);
         document.querySelectorAll('.group-header').forEach(header => header.remove());
         document.querySelectorAll('.world_entry').forEach(entry => {
             entry.style.display = '';
             entry.removeAttribute('data-group-name');
         });
-        groupEntries();
+        markAsReady();
+    }
+
+    function setupBookChangeDetection() {
+        document.addEventListener('click', (e) => {
+            if (e.target.matches('.select2-selection__choice__remove, .select2-results__option') ||
+                e.target.closest('.select2-selection__choice__remove, .select2-results__option')) {
+                scheduleGrouping();
+            }
+        });
+
+        document.addEventListener('change', (e) => {
+            if (e.target.matches('#world_info, #world_editor_select')) {
+                scheduleGrouping();
+            }
+        });
     }
 
     function initializeObserver() {
         const entriesList = document.getElementById('world_popup_entries_list');
-        if (entriesList) {
-            const observer = new MutationObserver((mutations) => {
-                if (settings.isEnabled) {
-                    const hasRelevantChanges = mutations.some(mutation =>
-                        Array.from(mutation.addedNodes).some(node => node.nodeType === 1 && node.classList.contains('world_entry')) ||
-                        Array.from(mutation.removedNodes).some(node => node.nodeType === 1 && (node.classList.contains('world_entry') || node.classList.contains('group-header')))
-                    );
-                    if (hasRelevantChanges) {
-                        clearTimeout(refreshDebounceTimer);
-                        refreshDebounceTimer = setTimeout(refreshWIView, 150);
-                    }
+        if (!entriesList) return;
+
+        if (observer) observer.disconnect();
+
+        observer = new MutationObserver(mutations => {
+            if (!settings.isEnabled) return;
+
+            if (mutations.some(m => [...m.addedNodes, ...m.removedNodes].some(n =>
+                n.nodeType === 1 && (n.classList?.contains('world_entry') || n.classList?.contains('group-header'))
+            ))) {
+                scheduleGrouping();
+            }
+        });
+
+        observer.observe(entriesList, { childList: true });
+
+        entriesList.addEventListener('blur', e => {
+            if (e.target.matches?.('textarea[name="comment"]')) scheduleGrouping();
+        }, true);
+
+        entriesList.addEventListener('click', e => {
+            if (e.target.matches?.('.duplicate_entry_button')) {
+                const entry = e.target.closest('.world_entry');
+                const groupName = entry?.getAttribute('data-group-name');
+                if (groupName) {
+                    setTimeout(() => {
+                        const newEntry = document.querySelector('.world_entry:not([data-group-name]):last-of-type');
+                        const textarea = newEntry?.querySelector('textarea[name="comment"]');
+                        if (textarea && !getGroupName(textarea.value)) {
+                            textarea.value = groupName + settings.separator + ' ' + textarea.value;
+                        }
+                        scheduleGrouping();
+                    }, 100);
                 }
-            });
-            observer.observe(entriesList, { childList: true });
-        }
+            }
+        }, true);
     }
 
     async function initializeSettings() {
@@ -155,22 +296,49 @@ import { saveSettingsDebounced } from "../../../../script.js";
 
         loadSettings();
 
+        const onSettingsChange = () => {
+            const newSettings = {
+                isEnabled: $('#wi-accordion-enabled').is(':checked'),
+                minGroupSize: parseInt($('#wi-accordion-min-size').val()) || 2,
+                separator: $('#wi-accordion-separator').val() || ':',
+                defaultCollapsed: $('#wi-accordion-collapsed').is(':checked'),
+                consolidateGroups: $('#wi-accordion-consolidate').is(':checked')
+            };
+
+            const needsRefresh = Object.entries(newSettings).some(([key, value]) =>
+                key !== 'defaultCollapsed' && settings[key] !== value
+            );
+
+            Object.assign(settings, newSettings);
+            saveSettings();
+
+            if (needsRefresh) {
+                cleanup();
+                scheduleGrouping();
+            }
+        };
+
         $('#wi-accordion-enabled').prop('checked', settings.isEnabled).on('change', onSettingsChange);
         $('#wi-accordion-collapsed').prop('checked', settings.defaultCollapsed).on('change', onSettingsChange);
+        $('#wi-accordion-consolidate').prop('checked', settings.consolidateGroups).on('change', onSettingsChange);
         $('#wi-accordion-min-size').val(settings.minGroupSize).on('input', onSettingsChange);
         $('#wi-accordion-separator').val(settings.separator).on('input', onSettingsChange);
-        $('#wi-accordion-refresh').on('click', refreshWIView);
+        $('#wi-accordion-refresh').on('click', () => { cleanup(); scheduleGrouping(); });
     }
 
     jQuery(async () => {
-        const checkPopup = setInterval(async function () {
+        addPreventiveCSS();
+
+        const checkPopup = setInterval(async () => {
             if ($('#world_popup_entries_list').length) {
                 clearInterval(checkPopup);
                 await initializeSettings();
                 initializeObserver();
-                refreshWIView();
+                setupBookChangeDetection();
+                scheduleGrouping();
             }
         }, 500);
     });
 
+    window.WIGroups_cleanup = cleanup;
 })();
