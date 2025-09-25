@@ -8,6 +8,10 @@ Groups together entries with a shared prefix
 <img width="884" height="504" alt="image" src="https://github.com/user-attachments/assets/8740ce59-67ab-44d3-8f26-16ee73c1b440" />
 
 ### Changelog
+- I realized I could just flip the method of group state creation to reduce lag and flickers
+- More styling 
+- Toggle groups option
+***
 - Better but still non-intrusive style
 - Saved un/collapsed states
 - Option for grouping your groups, default is off because I like to keep my system: entries visually apart
