@@ -5,7 +5,8 @@ https://github.com/Llynkurin/ST-Extension_WI_Groups.git
 ```
 ### World Info Grouped Headers
 Groups together entries with a shared prefix
-<img width="884" height="504" alt="image" src="https://github.com/user-attachments/assets/8740ce59-67ab-44d3-8f26-16ee73c1b440" />
+<img width="879" height="526" alt="image" src="https://github.com/user-attachments/assets/04ebd500-c42e-4891-90a1-c81806b05db6" />
+
 
 ### Changelog
 - I realized I could just flip the method of group state creation to reduce lag and flickers
