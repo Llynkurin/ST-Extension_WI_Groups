@@ -7,26 +7,54 @@
         <div class="inline-drawer-content">
             <div>Adds collapsible accordion headers for World Info entries that share a common prefix (e.g.,
                 "Location:", "Item:").</div>
+
             <label class="checkbox_label" for="wi-accordion-enabled">
                 <input id="wi-accordion-enabled" type="checkbox" class="checkbox">
                 Enable Grouping
             </label>
+
             <label class="checkbox_label" for="wi-accordion-collapsed">
                 <input id="wi-accordion-collapsed" type="checkbox" class="checkbox">
                 Collapse groups by default
             </label>
-            <label class="checkbox_label" for="wi-accordion-consolidate">
-                <input id="wi-accordion-consolidate" type="checkbox" class="checkbox">
-                <span>Consolidate entries physically</span>
-                <small style="display: block; margin-top: 4px; opacity: 0.7; font-size: 0.85em;">
-                    Enabled: Group entries together.<br>
-                    Disabled: Entries stay in their original positions.
-                </small>
-            </label>
-            <label for="wi-accordion-min-size">Minimum group size:</label>
-            <input id="wi-accordion-min-size" type="number" min="2" max="10" class="text_pole">
-            <label for="wi-accordion-separator">Group separator:</label>
-            <input id="wi-accordion-separator" type="text" class="text_pole">
+
+            <div class="settings-row">
+                <div class="setting-group">
+                    <label for="wi-accordion-separator">Group separators:</label>
+                    <input id="wi-accordion-separator" type="text" class="text_pole compact-input"
+                        placeholder="e.g., :, ->, @">
+                    <small class="consolidate-help-text">Enter one or more separators, separated by commas.</small>
+                </div>
+            </div>
+
+            <div class="inline-drawer advanced-settings">
+                <div class="inline-drawer-toggle inline-drawer-header">
+                    <span>Advanced Options</span>
+                    <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+                </div>
+                <div class="inline-drawer-content">
+                    <div class="settings-row">
+                        <div class="setting-group">
+                            <label for="wi-accordion-min-size">Minimum group size:</label>
+                            <input id="wi-accordion-min-size" type="number" min="2" max="10"
+                                class="text_pole compact-input">
+                        </div>
+                    </div>
+
+                    <div class="consolidate-toggle-container">
+                        <label class="toggle-switch-label" for="wi-accordion-consolidate">
+                            Consolidate entries physically
+                            <div class="toggle-switch">
+                                <input id="wi-accordion-consolidate" type="checkbox" class="toggle-switch-checkbox">
+                                <div class="toggle-switch-slider"></div>
+                            </div>
+                        </label>
+                        <small id="consolidate-help-text" class="consolidate-help-text">
+                            Group entries together.
+                        </small>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
